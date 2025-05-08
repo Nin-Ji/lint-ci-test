@@ -23,8 +23,6 @@ jobs:
       - name: Run textlint (avoiding error)
         run: npx textlint ./contents/**/*.md | tee ./.textlint.log || true
         shell: bash
-      - name: Install GitHub CLI
-        run: sudo apt-get update && sudo apt-get install -y gh
       - name: Report if textlint finds problems
         run: |
           if [ -s ./.textlint.log ]; then
