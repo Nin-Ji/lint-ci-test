@@ -1,4 +1,4 @@
-name: run-textlint
+name: run-textlint&markdownlint
 on: 
   pull_request_target:
     types: [ opened, synchronize ]
@@ -14,13 +14,16 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+
       - name: Setup node with cache
         uses: actions/setup-node@v3
         with:
           node-version: 18
           cache: 'npm'
+
       - name: Install packages via packages.json
         run: npm install
+
       - name: Get changed Markdown files (in this PR)
         id: changed
         run: |
@@ -28,20 +31,41 @@ jobs:
           echo "Base SHA: $base_sha"
           git diff --name-only "$base_sha" HEAD | grep '^contents/.*\.md$' > files.txt || true
           cat files.txt
-      - name: Run textlint on changed files
+
+      - name: Run textlint and markdownlint
         run: |
-          if [ -s files.txt ]; then
-            cat files.txt | xargs npx textlint | tee ./.textlint.log || true
-          else
-            echo "No matching .md files to lint."
-          fi
+            rm -f .textlint.log .markdownlint.log
+            if [ -s files.txt ]; then
+              echo "Running textlint..."
+              cat files.txt | xargs npx textlint | tee .textlint.log || true
+  
+              echo "Running markdownlint..."
+              cat files.txt | xargs npx markdownlint --stdin --no-error >> .markdownlint.log || true
+            else
+              echo "No matching .md files to lint."
+            fi
+
       - name: Comment on PR if lint issues found
         run: |
-            if [ -s ./.textlint.log ]; then
-              pwd_esc=$(pwd | sed 's/\//\\\//g')
-              sed "s/${pwd_esc}/### :policeman: ./g" ./.textlint.log >> ./.body.txt
-              gh pr comment --body-file ./.body.txt "${URL}"
-            fi      
+              if [ -s .textlint.log ] || [ -s .markdownlint.log ]; then
+                echo "### :policeman: Lint Report" > .body.txt
+    
+                if [ -s .textlint.log ]; then
+                  echo -e "\n#### textlint:\n\`\`\`" >> .body.txt
+                  cat .textlint.log >> .body.txt
+                  echo -e "\`\`\`" >> .body.txt
+                fi
+    
+                if [ -s .markdownlint.log ]; then
+                  echo -e "\n#### markdownlint:\n\`\`\`" >> .body.txt
+                  cat .markdownlint.log >> .body.txt
+                  echo -e "\`\`\`" >> .body.txt
+                fi
+    
+                gh pr comment --body-file ./.body.txt "${URL}"
+              else
+                echo "No lint problems found."
+              fi   
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           URL: ${{ github.event.pull_request.html_url }}
