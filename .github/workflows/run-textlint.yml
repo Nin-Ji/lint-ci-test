@@ -13,6 +13,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
       - name: Setup node with cache
         uses: actions/setup-node@v3
         with:
@@ -20,29 +21,27 @@ jobs:
           cache: 'npm'
       - name: Install packages via packages.json
         run: npm install
-      - name: Get changed Markdown files
-        id: changes
+      - name: Get changed Markdown files (in this PR)
+        id: changed
         run: |
-          git fetch origin ${{ github.event.pull_request.base.ref }}
-          git diff --name-only origin/${{ github.event.pull_request.base.ref }} HEAD \
-            | grep '^contents/.*\.md$' > files.txt || true
+          base_sha=$(git merge-base origin/${{ github.event.pull_request.base.ref }} HEAD)
+          echo "Base SHA: $base_sha"
+          git diff --name-only "$base_sha" HEAD | grep '^contents/.*\.md$' > files.txt || true
           cat files.txt
-
       - name: Run textlint on changed files
-        if: success()
         run: |
           if [ -s files.txt ]; then
             cat files.txt | xargs npx textlint | tee ./.textlint.log || true
           else
             echo "No matching .md files to lint."
           fi
-      - name: Report if textlint finds problems
+      - name: Comment on PR if lint issues found
         run: |
-          if [ -s ./.textlint.log ]; then
-            pwd_esc=$(pwd | sed 's/\//\\\//g')
-            sed "s/${pwd_esc}/### :policeman: ./g" ./.textlint.log >> ./.body.txt
-            gh pr comment --body-file ./.body.txt "${URL}"
-          fi         
+            if [ -s ./.textlint.log ]; then
+              pwd_esc=$(pwd | sed 's/\//\\\//g')
+              sed "s/${pwd_esc}/### :policeman: ./g" ./.textlint.log >> ./.body.txt
+              gh pr comment --body-file ./.body.txt "${URL}"
+            fi      
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           URL: ${{ github.event.pull_request.html_url }}
