@@ -20,9 +20,22 @@ jobs:
           cache: 'npm'
       - name: Install packages via packages.json
         run: npm install
-      - name: Run textlint (avoiding error)
-        run: npx textlint ./contents/**/*.md | tee ./.textlint.log || true
-        shell: bash
+      - name: Get changed Markdown files
+        id: changes
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+          git diff --name-only origin/${{ github.event.pull_request.base.ref }} HEAD \
+            | grep '^contents/.*\.md$' > files.txt || true
+          cat files.txt
+
+      - name: Run textlint on changed files
+        if: success()
+        run: |
+          if [ -s files.txt ]; then
+            cat files.txt | xargs npx textlint | tee ./.textlint.log || true
+          else
+            echo "No matching .md files to lint."
+          fi
       - name: Report if textlint finds problems
         run: |
           if [ -s ./.textlint.log ]; then
