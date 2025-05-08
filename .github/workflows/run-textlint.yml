@@ -23,15 +23,15 @@ jobs:
       - name: Run textlint (avoiding error)
         run: npx textlint ./contents/**/*.md | tee ./.textlint.log || true
         shell: bash
+      - name: Install GitHub CLI
+        run: sudo apt-get update && sudo apt-get install -y gh
       - name: Report if textlint finds problems
         run: |
           if [ -s ./.textlint.log ]; then
-            # create body file
             pwd_esc=$(pwd | sed 's/\//\\\//g')
-            cat ./.textlint.log | sed "s/${pwd_esc}/### :policeman: ./g" >> ./.body.txt
-            # pr comment
+            sed "s/${pwd_esc}/### :policeman: ./g" ./.textlint.log >> ./.body.txt
             gh pr comment --body-file ./.body.txt "${URL}"
-          fi        
+          fi         
         env:
-          token: ${{ secrets.MY_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
           URL: ${{ github.event.pull_request.html_url }}
