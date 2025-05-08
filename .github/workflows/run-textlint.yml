@@ -38,9 +38,9 @@ jobs:
             if [ -s files.txt ]; then
               echo "Running textlint..."
               cat files.txt | xargs npx textlint | tee .textlint.log || true
-  
+        
               echo "Running markdownlint..."
-              cat files.txt | xargs npx markdownlint --stdin --no-error >> .markdownlint.log || true
+              cat files.txt | xargs npx markdownlint >> .markdownlint.log || true
             else
               echo "No matching .md files to lint."
             fi
