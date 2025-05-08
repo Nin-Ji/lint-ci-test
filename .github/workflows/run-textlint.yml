@@ -21,11 +21,11 @@ jobs:
       - name: Install packages via packages.json
         run: npm install
       - name: Run textlint (avoiding error)
-        run: npx textlint ./contents/**/*.md -o ./.textlint.log | true
-        shell: bash {0}
+        run: npx textlint ./contents/**/*.md | tee ./.textlint.log || true
+        shell: bash
       - name: Report if textlint finds problems
         run: |
-          if [ -e ./.textlint.log ]; then
+          if [ -s ./.textlint.log ]; then
             # create body file
             pwd_esc=$(pwd | sed 's/\//\\\//g')
             cat ./.textlint.log | sed "s/${pwd_esc}/### :policeman: ./g" >> ./.body.txt
@@ -33,5 +33,5 @@ jobs:
             gh pr comment --body-file ./.body.txt "${URL}"
           fi        
         env:
-          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_TOKEN }}
+          token: ${{ secrets.MY_GITHUB_TOKEN }}
           URL: ${{ github.event.pull_request.html_url }}
