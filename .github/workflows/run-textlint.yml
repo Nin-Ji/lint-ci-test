@@ -40,7 +40,7 @@ jobs:
               cat files.txt | xargs npx textlint | tee .textlint.log || true
         
               echo "Running markdownlint..."
-              cat files.txt | xargs npx markdownlint >> .markdownlint.log || true
+              npx markdownlint $(cat files.txt) --output .markdownlint.log || true
             else
               echo "No matching .md files to lint."
             fi
