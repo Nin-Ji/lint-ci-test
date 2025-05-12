@@ -44,10 +44,10 @@ jobs:
 
           if [ -s files.txt ]; then
             echo "Running textlint..."
-            cat files.txt | xargs npx textlint | tee .textlint.log | true
+            xargs npx textlint < files.txt 2>&1 | tee .textlint.log || true
 
             echo "Running markdownlint..."
-            cat files.txt | xargs npx markdownlint | sed 's/^/Error: /' | tee .markdownlint.log || true
+            xargs npx markdownlint < files.txt 2>&1 | tee .markdownlint.log || true
           else
             echo "No matching .md files to lint."
           fi
@@ -63,9 +63,8 @@ jobs:
             fi
 
             if [ -s .markdownlint.log ]; then
-              printf "\n#### markdownlint:\n\`\`\`\n" >> .body.txt
+              echo -e "\n#### markdownlint:\n" >> .body.txt
               cat .markdownlint.log >> .body.txt
-              printf "\n\`\`\`\n" >> .body.txt
             fi
 
             echo "--- PR Comment Body ---"
