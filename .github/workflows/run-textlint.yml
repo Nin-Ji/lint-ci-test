@@ -41,28 +41,13 @@ jobs:
       - name: Run textlint and markdownlint with annotations
         run: |
           rm -f .textlint.log .markdownlint.log
-          error_found="no"
 
           if [ -s files.txt ]; then
             echo "Running textlint..."
-            for file in $(cat files.txt); do
-              npx textlint --quiet --format json "$file" > .tlint_tmp.json || true
-              jq -c '.[] | { filePath: .filePath, messages: .messages }' .tlint_tmp.json | while read -r item; do
-                f=$(echo "$item" | jq -r .filePath)
-                echo "$item" | jq -c '.messages[] | {line: .line, column: .column, message: .message, ruleId: .ruleId}' | while read -r issue; do
-                  line=$(echo "$issue" | jq -r .line)
-                  col=$(echo "$issue" | jq -r .column)
-                  msg=$(echo "$issue" | jq -r .message)
-                  rule=$(echo "$issue" | jq -r .ruleId)
-                  echo "::error file=$f,line=$line,col=$col::${rule}: ${msg}"
-                  echo "Error: $f:$line:$col ${msg} (${rule})" >> .textlint.log
-                  error_found="yes"
-                done
-              done
-            done
+            cat files.txt | xargs npx textlint --format compact | tee .textlint.log || true
 
             echo "Running markdownlint..."
-            cat files.txt | xargs npx markdownlint | sed 's/^/Error: /' | tee .markdownlint.log || true
+            cat files.txt | xargs npx markdownlint | tee .markdownlint.log || true
           else
             echo "No matching .md files to lint."
           fi
