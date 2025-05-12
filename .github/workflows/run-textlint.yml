@@ -1,6 +1,6 @@
 name: run-textlint&markdownlint
 on: 
-  pull_request_target:
+  pull_request:
     types: [ opened, synchronize ]
     paths: [ 'contents/**/*.md' ]
 jobs:
