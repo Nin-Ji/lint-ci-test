@@ -34,29 +34,49 @@ jobs:
 
       - name: Run textlint and markdownlint (with annotation)
         run: |
-          rm -f .textlint.log .markdownlint.log .markdownlint.json
+          rm -f .textlint.log .markdownlint.log
+          error_found="no"
+
           if [ -s files.txt ]; then
             echo "Running textlint..."
             cat files.txt | xargs npx textlint | tee .textlint.log >/dev/null || true
 
-            echo "Running markdownlint (with JSON)..."
-            has_error=0
+            echo "Running markdownlint with JSON and annotations..."
             for file in $(cat files.txt); do
-              npx markdownlint "$file" --json > .markdownlint.json || true
-              jq -c '.[] | .file as $file | .errors[] | {file: $file, line: .lineNumber, rule: .ruleNames[0], message: .ruleDescription}' .markdownlint.json |
-              while read -r issue; do
-                file=$(echo "$issue" | jq -r .file)
-                line=$(echo "$issue" | jq -r .line)
-                rule=$(echo "$issue" | jq -r .rule)
-                msg=$(echo "$issue" | jq -r .message)
-                echo "::warning file=$file,line=$line::${rule}: ${msg}"
-                has_error=1
+              echo "Linting $file"
+              npx markdownlint "$file" --json > .mlint_tmp.json || true
+
+              if [ ! -s .mlint_tmp.json ]; then
+                continue
+              fi
+
+              jq -c '.[] | {
+                  file: .fileName,
+                  errors: .errors
+                }' .mlint_tmp.json | while read -r item; do
+                  file=$(echo "$item" | jq -r .file)
+                  echo "$item" | jq -c '.errors[] | {
+                    line: .lineNumber,
+                    rule: .ruleNames[0],
+                    message: .ruleDescription
+                  }' | while read -r issue; do
+                    line=$(echo "$issue" | jq -r .line)
+                    rule=$(echo "$issue" | jq -r .rule)
+                    msg=$(echo "$issue" | jq -r .message)
+
+                    echo "::warning file=$file,line=$line::${rule}: ${msg}"
+                    error_found="yes"
+                  done
               done
             done
-            exit $has_error
+
+            if [ "$error_found" = "yes" ]; then
+              exit 1
+            fi
           else
             echo "No matching .md files to lint."
           fi
+
 
       - name: Comment on PR if lint issues found
         run: |
