@@ -55,6 +55,7 @@ jobs:
                   errors: .errors
                 }' .mlint_tmp.json | while read -r item; do
                   file=$(echo "$item" | jq -r .file)
+                  fullpath=$(realpath "$file")
                   echo "$item" | jq -c '.errors[] | {
                     line: .lineNumber,
                     rule: .ruleNames[0],
@@ -64,7 +65,7 @@ jobs:
                     rule=$(echo "$issue" | jq -r .rule)
                     msg=$(echo "$issue" | jq -r .message)
 
-                    echo "::warning file=$file,line=$line::${rule}: ${msg}"
+                    echo "::warning file=$fullpath,line=$line::${rule}: ${msg}"
                     error_found="yes"
                   done
               done
