@@ -65,14 +65,13 @@ jobs:
 
             if [ -s .markdownlint.log ]; then
               echo -e "\n#### markdownlint:\n" >> .body.txt
-              pwd_esc=$(pwd | sed 's/\//\\\//g')
-              cat .markdownlint.log | sed "s/${pwd_esc}/### :policeman: ./g" >> .body.txt
+              cat .markdownlint.log >> .body.txt
             fi
 
             echo "--- PR Comment Body ---"
             cat .body.txt
 
-            gh pr comment --body-file ./.body.txt --edit-last "${URL}"
+            gh pr comment --body-file ./.body.txt "${URL}"
           else
             echo "No lint problems found."
           fi
