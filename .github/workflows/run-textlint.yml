@@ -63,9 +63,9 @@ jobs:
             fi
 
             if [ -s .markdownlint.log ]; then
-              echo -e "\n#### markdownlint:\n\`\`\`" >> .body.txt
+              printf "\n#### markdownlint:\n\`\`\`\n" >> .body.txt
               cat .markdownlint.log >> .body.txt
-              echo -e "\`\`\`\n" >> .body.txt
+              printf "\n\`\`\`\n" >> .body.txt
             fi
 
             echo "--- PR Comment Body ---"
