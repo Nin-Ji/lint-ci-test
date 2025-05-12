@@ -45,10 +45,10 @@ jobs:
             for file in $(cat files.txt); do
               echo "Linting $file"
 
-              # 保存用：PR コメント表示用ログ
+              # PR コメント表示用ログ保存
               npx markdownlint "$file" 2>> .markdownlint.log || true
 
-              # アノテーション用 JSON 出力
+              # JSON 出力（アノテーション用）
               npx markdownlint "$file" --json > .mlint_tmp.json || true
 
               if [ ! -s .mlint_tmp.json ]; then
@@ -59,7 +59,8 @@ jobs:
                   file: .fileName,
                   errors: .errors
                 }' .mlint_tmp.json | while read -r item; do
-                  file=$(echo "$item" | jq -r .file)  # ← 相対パスを保持
+                  relpath=$(echo "$item" | jq -r .file)
+                  fullpath="${GITHUB_WORKSPACE}/${relpath}"
                   echo "$item" | jq -c '.errors[] | {
                     line: .lineNumber,
                     rule: .ruleNames[0],
@@ -69,8 +70,7 @@ jobs:
                     rule=$(echo "$issue" | jq -r .rule)
                     msg=$(echo "$issue" | jq -r .message)
 
-                    # 👇 realpath を使わずに相対パスのまま出力
-                    echo "::warning file=$file,line=$line::${rule}: ${msg}"
+                    echo "::warning file=$fullpath,line=$line::${rule}: ${msg}"
                     error_found="yes"
                   done
               done
@@ -82,6 +82,7 @@ jobs:
           else
             echo "No matching .md files to lint."
           fi
+
 
       - name: Comment on PR if lint issues found
         run: |
