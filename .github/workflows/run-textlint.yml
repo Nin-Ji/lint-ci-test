@@ -24,6 +24,9 @@ jobs:
       - name: Install packages via packages.json
         run: npm install
 
+      - name: Add markdownlint problem matcher
+        uses: xt0rted/markdownlint-problem-matcher@v2
+
       - name: Get changed Markdown files (in this PR)
         id: changed
         run: |
@@ -40,7 +43,7 @@ jobs:
               cat files.txt | xargs npx textlint | tee .textlint.log >/dev/null || true
         
               echo "Running markdownlint..."
-              npx markdownlint $(cat files.txt) --output .markdownlint.log || true
+              npx markdownlint $(cat files.txt) 2>&1 | tee .markdownlint.log || true
             else
               echo "No matching .md files to lint."
             fi
