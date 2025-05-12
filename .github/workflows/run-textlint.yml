@@ -44,6 +44,11 @@ jobs:
             echo "Running markdownlint with JSON and annotations..."
             for file in $(cat files.txt); do
               echo "Linting $file"
+
+              # 保存用：PR コメント表示用ログ
+              npx markdownlint "$file" >> .markdownlint.log || true
+
+              # アノテーション用 JSON 出力
               npx markdownlint "$file" --json > .mlint_tmp.json || true
 
               if [ ! -s .mlint_tmp.json ]; then
@@ -77,7 +82,6 @@ jobs:
           else
             echo "No matching .md files to lint."
           fi
-
 
       - name: Comment on PR if lint issues found
         run: |
