@@ -44,7 +44,7 @@ jobs:
 
           if [ -s files.txt ]; then
             echo "Running textlint..."
-            xargs npx textlint < files.txt 2>&1 | tee .textlint.log || true
+            xargs npx textlint < files.txt 2>&1 | tee .textlint_raw.log || true
 
             echo "Running markdownlint..."
             xargs npx markdownlint < files.txt 2>&1 | tee .markdownlint.log || true
@@ -57,7 +57,7 @@ jobs:
           if [ -s .textlint.log ] || [ -s .markdownlint.log ]; then
             pwd_esc=$(pwd | sed 's/\//\\\//g')
             sed "s/${pwd_esc}/### :policeman: ./g" .textlint_raw.log > .textlint.log
-            
+
             echo "### :policeman: Lint Report" > .body.txt
 
             if [ -s .textlint.log ]; then
