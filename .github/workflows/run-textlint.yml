@@ -3,6 +3,7 @@ on:
   pull_request:
     types: [ opened, synchronize ]
     paths: [ 'contents/**/*.md' ]
+
 jobs:
   run-textlint:
     runs-on: ubuntu-latest
@@ -21,8 +22,11 @@ jobs:
           node-version: 22
           cache: 'npm'
 
-      - name: Install packages via packages.json
+      - name: Install packages via package.json
         run: npm install
+
+      - name: Add markdownlint problem matcher
+        uses: xt0rted/markdownlint-problem-matcher@v2
 
       - name: Get changed Markdown files (in this PR)
         id: changed
@@ -32,57 +36,18 @@ jobs:
           git diff --name-only "$base_sha" HEAD | grep '^contents/.*\.md$' > files.txt || true
           cat files.txt
 
-      - name: Run textlint and markdownlint (with annotation)
+      - name: Run textlint and markdownlint with annotations
         run: |
           rm -f .textlint.log .markdownlint.log
-          error_found="no"
-
           if [ -s files.txt ]; then
             echo "Running textlint..."
-            cat files.txt | xargs npx textlint | tee .textlint.log >/dev/null || true
+            cat files.txt | xargs npx textlint | tee .textlint.log || true
 
-            echo "Running markdownlint with JSON and annotations..."
-            for file in $(cat files.txt); do
-              echo "Linting $file"
-
-              # PR コメント表示用ログ保存
-              npx markdownlint "$file" 2>> .markdownlint.log || true
-
-              # JSON 出力（アノテーション用）
-              npx markdownlint "$file" --json > .mlint_tmp.json || true
-
-              if [ ! -s .mlint_tmp.json ]; then
-                continue
-              fi
-
-              jq -c '.[] | {
-                  file: .fileName,
-                  errors: .errors
-                }' .mlint_tmp.json | while read -r item; do
-                  relpath=$(echo "$item" | jq -r .file)
-                  fullpath="${GITHUB_WORKSPACE}/${relpath}"
-                  echo "$item" | jq -c '.errors[] | {
-                    line: .lineNumber,
-                    rule: .ruleNames[0],
-                    message: .ruleDescription
-                  }' | while read -r issue; do
-                    line=$(echo "$issue" | jq -r .line)
-                    rule=$(echo "$issue" | jq -r .rule)
-                    msg=$(echo "$issue" | jq -r .message)
-
-                    echo "::warning file=$fullpath,line=$line::${rule}: ${msg}"
-                    error_found="yes"
-                  done
-              done
-            done
-
-            if [ "$error_found" = "yes" ]; then
-              exit 1
-            fi
+            echo "Running markdownlint..."
+            cat files.txt | xargs npx markdownlint --no-color | tee .markdownlint.log || true
           else
             echo "No matching .md files to lint."
           fi
-
 
       - name: Comment on PR if lint issues found
         run: |
