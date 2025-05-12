@@ -55,6 +55,9 @@ jobs:
       - name: Comment on PR if lint issues found
         run: |
           if [ -s .textlint.log ] || [ -s .markdownlint.log ]; then
+            pwd_esc=$(pwd | sed 's/\//\\\//g')
+            sed "s/${pwd_esc}/### :policeman: ./g" .textlint_raw.log > .textlint.log
+            
             echo "### :policeman: Lint Report" > .body.txt
 
             if [ -s .textlint.log ]; then
