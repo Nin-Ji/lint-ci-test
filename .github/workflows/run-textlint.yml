@@ -18,7 +18,7 @@ jobs:
       - name: Setup node with cache
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 22
           cache: 'npm'
 
       - name: Install packages via packages.json
@@ -32,39 +32,52 @@ jobs:
           git diff --name-only "$base_sha" HEAD | grep '^contents/.*\.md$' > files.txt || true
           cat files.txt
 
-      - name: Run textlint and markdownlint
+      - name: Run textlint and markdownlint (with annotation)
         run: |
-            rm -f .textlint.log .markdownlint.log
-            if [ -s files.txt ]; then
-              echo "Running textlint..."
-              cat files.txt | xargs npx textlint | tee .textlint.log >/dev/null || true
-        
-              echo "Running markdownlint..."
-              npx markdownlint $(cat files.txt) --output .markdownlint.log || true
-            else
-              echo "No matching .md files to lint."
-            fi
+          rm -f .textlint.log .markdownlint.log .markdownlint.json
+          if [ -s files.txt ]; then
+            echo "Running textlint..."
+            cat files.txt | xargs npx textlint | tee .textlint.log >/dev/null || true
+
+            echo "Running markdownlint (with JSON)..."
+            has_error=0
+            for file in $(cat files.txt); do
+              npx markdownlint "$file" --json > .markdownlint.json || true
+              jq -c '.[] | .file as $file | .errors[] | {file: $file, line: .lineNumber, rule: .ruleNames[0], message: .ruleDescription}' .markdownlint.json |
+              while read -r issue; do
+                file=$(echo "$issue" | jq -r .file)
+                line=$(echo "$issue" | jq -r .line)
+                rule=$(echo "$issue" | jq -r .rule)
+                msg=$(echo "$issue" | jq -r .message)
+                echo "::warning file=$file,line=$line::${rule}: ${msg}"
+                has_error=1
+              done
+            done
+            exit $has_error
+          else
+            echo "No matching .md files to lint."
+          fi
 
       - name: Comment on PR if lint issues found
         run: |
-              if [ -s .textlint.log ] || [ -s .markdownlint.log ]; then
-                echo "### :policeman: Lint Report" > .body.txt
-          
-                if [ -s .textlint.log ]; then
-                  echo -e "\n#### textlint:\n" >> .body.txt
-                  cat .textlint.log >> .body.txt
-                fi
-          
-                if [ -s .markdownlint.log ]; then
-                  echo -e "\n#### markdownlint:\n" >> .body.txt
-                  cat .markdownlint.log >> .body.txt
-                fi
-          
-                cat .body.txt
-                gh pr comment --body-file ./.body.txt "${URL}"
-              else
-                echo "No lint problems found."
-              fi
+          if [ -s .textlint.log ] || [ -s .markdownlint.log ]; then
+            echo "### :policeman: Lint Report" > .body.txt
+
+            if [ -s .textlint.log ]; then
+              echo -e "\n#### textlint:\n" >> .body.txt
+              cat .textlint.log >> .body.txt
+            fi
+
+            if [ -s .markdownlint.log ]; then
+              echo -e "\n#### markdownlint:\n" >> .body.txt
+              cat .markdownlint.log >> .body.txt
+            fi
+
+            cat .body.txt
+            gh pr comment --body-file ./.body.txt "${URL}"
+          else
+            echo "No lint problems found."
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           URL: ${{ github.event.pull_request.html_url }}
