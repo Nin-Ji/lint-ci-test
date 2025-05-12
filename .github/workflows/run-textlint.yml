@@ -1,68 +1,59 @@
 name: run-textlint&markdownlint
 
-on:
-  pull_request_target:
+on: 
+  pull_request:
     types: [opened, synchronize]
     paths: ['contents/**/*.md']
 
 jobs:
-  run-linters:
+  run-textlint:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+
     steps:
-      - name: Checkout PR branch
+      - name: Switch to pull request branch
         uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - name: Setup Node.js
+      - name: Setup node with cache
         uses: actions/setup-node@v3
         with:
           node-version: 22
-          cache: npm
+          cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install packages via packages.json
         run: npm install
 
-      - name: Get changed Markdown files
+      - name: Add markdownlint problem matcher
+        uses: xt0rted/markdownlint-problem-matcher@v2
+
+      - name: Get changed Markdown files (in this PR)
         id: changed
         run: |
           base_sha=$(git merge-base origin/${{ github.event.pull_request.base.ref }} HEAD)
+          echo "Base SHA: $base_sha"
           git diff --name-only "$base_sha" HEAD | grep '^contents/.*\.md$' > files.txt || true
           cat files.txt
 
-      - name: Run textlint with annotation
+      - name: Run textlint and markdownlint with annotations
         run: |
+          rm -f .textlint.log .markdownlint.log
+          error_found="no"
+
           if [ -s files.txt ]; then
             echo "Running textlint..."
-            cat files.txt | xargs npx textlint | tee .textlint.log || true
+            cat files.txt | xargs npx textlint --format compact | tee .textlint.log || true
+
+            echo "Running markdownlint..."
+            cat files.txt | xargs npx markdownlint | tee .markdownlint.log || true
           else
-            echo "No markdown files changed."
+            echo "No matching .md files to lint."
           fi
 
-      - name: Run markdownlint with annotation
-        run: |
-          rm -f .markdownlint.log
-          if [ -s files.txt ]; then
-            echo "Running markdownlint with manual annotation..."
-            while IFS= read -r file; do
-              result=$(npx markdownlint "$file")
-              if [ -n "$result" ]; then
-                echo "$result" >> .markdownlint.log
-                echo "$result" | while IFS= read -r line; do
-                  file_path=$(echo "$line" | cut -d':' -f1)
-                  line_number=$(echo "$line" | cut -d':' -f2)
-                  rule=$(echo "$line" | cut -d' ' -f3)
-                  msg=$(echo "$line" | cut -d' ' -f4-)
-                  echo "::warning file=$file_path,line=$line_number::${rule}: ${msg}"
-                done
-              fi
-            done < files.txt
-          fi
-
-      - name: Comment on PR if issues found
+      - name: Comment on PR if lint issues found
         run: |
           if [ -s .textlint.log ] || [ -s .markdownlint.log ]; then
             echo "### :policeman: Lint Report" > .body.txt
