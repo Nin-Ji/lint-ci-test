@@ -40,7 +40,7 @@ jobs:
             rm -f .textlint.log .markdownlint.log
             if [ -s files.txt ]; then
               echo "Running textlint..."
-              cat files.txt | xargs npx textlint | tee .textlint.log >/dev/null || true
+              xargs npx textlint < files.txt 2>&1 | tee .textlint.log || true
         
               echo "Running markdownlint..."
               npx markdownlint $(cat files.txt) 2>&1 | tee .markdownlint.log || true
