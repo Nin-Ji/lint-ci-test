@@ -46,7 +46,7 @@ jobs:
               echo "Linting $file"
 
               # 保存用：PR コメント表示用ログ
-              npx markdownlint "$file" >> .markdownlint.log || true
+              npx markdownlint "$file" 2>> .markdownlint.log || true
 
               # アノテーション用 JSON 出力
               npx markdownlint "$file" --json > .mlint_tmp.json || true
