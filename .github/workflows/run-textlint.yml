@@ -44,7 +44,7 @@ jobs:
 
           if [ -s files.txt ]; then
             echo "Running textlint..."
-            cat files.txt | xargs npx textlint | tee .textlint.log >/dev/null || true
+            xargs npx textlint < files.txt 2>&1 | tee .textlint.log || true
 
             echo "Running markdownlint..."
             cat files.txt | xargs npx markdownlint | sed 's/^/Error: /' | tee .markdownlint.log || true
