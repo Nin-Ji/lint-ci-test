@@ -59,16 +59,20 @@ jobs:
 
             if [ -s .textlint.log ]; then
               echo -e "\n#### textlint:\n" >> .body.txt
-              cat .textlint.log >> .body.txt
+              pwd_esc=$(pwd | sed 's/\//\\\//g')
+              cat .textlint.log | sed "s/${pwd_esc}/### :policeman: ./g" >> .body.txt
             fi
 
             if [ -s .markdownlint.log ]; then
               echo -e "\n#### markdownlint:\n" >> .body.txt
-              cat .markdownlint.log >> .body.txt
+              pwd_esc=$(pwd | sed 's/\//\\\//g')
+              cat .markdownlint.log | sed "s/${pwd_esc}/### :policeman: ./g" >> .body.txt
             fi
 
+            echo "--- PR Comment Body ---"
             cat .body.txt
-            gh pr comment --body-file ./.body.txt "${URL}"
+
+            gh pr comment --body-file ./.body.txt --edit-last "${URL}"
           else
             echo "No lint problems found."
           fi
