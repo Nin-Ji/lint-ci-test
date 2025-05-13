@@ -6,18 +6,21 @@ on:
     paths: ['contents/**/*.md']
 
 jobs:
-  setup:
+  lint:
     runs-on: ubuntu-latest
-    outputs:
-      files: ${{ steps.changed.outputs.files }}
+    strategy:
+      matrix:
+        linter: [textlint, markdownlint]
+    permissions:
+      pull-requests: write
     steps:
-      - name: Switch to pull request branch
+      - name: Checkout PR branch
         uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - name: Setup node with cache
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 22
@@ -26,67 +29,38 @@ jobs:
       - name: Install packages
         run: npm install
 
+      - name: Add markdownlint problem matcher (only for markdownlint)
+        if: matrix.linter == 'markdownlint'
+        uses: xt0rted/markdownlint-problem-matcher@v2
+
       - name: Get changed Markdown files
         id: changed
         run: |
           base_sha=$(git merge-base origin/${{ github.event.pull_request.base.ref }} HEAD)
           git diff --name-only "$base_sha" HEAD | grep '^contents/.*\.md$' > files.txt || true
           cat files.txt
-          echo "files=$(cat files.txt | paste -sd ' ' -)" >> "$GITHUB_OUTPUT"
 
-  run-textlint:
-    needs: setup
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    steps:
-      - name: Run textlint
+      - name: Run linter
         run: |
-          echo "${{ needs.setup.outputs.files }}" > files.txt
-          rm -f .textlint.log
-          if [ -s files.txt ]; then
-            echo "Running textlint..."
-            xargs npx textlint < files.txt 2>&1 | tee .textlint.log || true
-          else
+          if [ ! -s files.txt ]; then
             echo "No matching .md files to lint."
+            exit 0
           fi
 
-      - name: Comment on PR (textlint)
-        run: |
-          if [ -s .textlint.log ]; then
-            echo "### :policeman: textlint Report" > .body.txt
-            cat .textlint.log >> .body.txt
-            gh pr comment --body-file ./.body.txt "${URL}"
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          URL: ${{ github.event.pull_request.html_url }}
+          echo "Running ${{ matrix.linter }}..."
+          rm -f .lint.log
 
-  run-markdownlint:
-    needs: setup
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    steps:
-      - name: Add markdownlint problem matcher
-        uses: xt0rted/markdownlint-problem-matcher@v2
-
-      - name: Run markdownlint
-        run: |
-          echo "${{ needs.setup.outputs.files }}" > files.txt
-          rm -f .markdownlint.log
-          if [ -s files.txt ]; then
-            echo "Running markdownlint..."
-            npx markdownlint $(cat files.txt) 2>&1 | tee .markdownlint.log || true
+          if [ "${{ matrix.linter }}" = "textlint" ]; then
+            xargs npx textlint < files.txt 2>&1 | tee .lint.log || true
           else
-            echo "No matching .md files to lint."
+            npx markdownlint $(cat files.txt) 2>&1 | tee .lint.log || true
           fi
 
-      - name: Comment on PR (markdownlint)
+      - name: Comment on PR
         run: |
-          if [ -s .markdownlint.log ]; then
-            echo "### :policeman: markdownlint Report" > .body.txt
-            cat .markdownlint.log >> .body.txt
+          if [ -s .lint.log ]; then
+            echo "### :policeman: ${{ matrix.linter }} Report" > .body.txt
+            cat .lint.log >> .body.txt
             gh pr comment --body-file ./.body.txt "${URL}"
           fi
         env:
