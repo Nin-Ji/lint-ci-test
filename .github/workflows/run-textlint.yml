@@ -9,7 +9,7 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
-      base_sha: ${{ steps.get-sha.outputs.base_sha }}
+      files: ${{ steps.changed.outputs.files }}
     steps:
       - name: Switch to pull request branch
         uses: actions/checkout@v3
@@ -27,19 +27,12 @@ jobs:
         run: npm install
 
       - name: Get changed Markdown files
-        id: get-sha
+        id: changed
         run: |
           base_sha=$(git merge-base origin/${{ github.event.pull_request.base.ref }} HEAD)
-          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
           git diff --name-only "$base_sha" HEAD | grep '^contents/.*\.md$' > files.txt || true
           cat files.txt
-        shell: bash
-
-      - name: Upload files.txt
-        uses: actions/upload-artifact@v4
-        with:
-          name: md-files
-          path: files.txt
+          echo "files=$(cat files.txt | paste -sd ' ' -)" >> "$GITHUB_OUTPUT"
 
   run-textlint:
     needs: setup
@@ -47,21 +40,18 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: md-files
-
       - name: Run textlint
         run: |
+          echo "${{ needs.setup.outputs.files }}" > files.txt
           rm -f .textlint.log
           if [ -s files.txt ]; then
+            echo "Running textlint..."
             xargs npx textlint < files.txt 2>&1 | tee .textlint.log || true
           else
-            echo "No .md files to lint."
+            echo "No matching .md files to lint."
           fi
 
       - name: Comment on PR (textlint)
-        if: success() || failure()
         run: |
           if [ -s .textlint.log ]; then
             echo "### :policeman: textlint Report" > .body.txt
@@ -78,24 +68,21 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: md-files
-
       - name: Add markdownlint problem matcher
         uses: xt0rted/markdownlint-problem-matcher@v2
 
       - name: Run markdownlint
         run: |
+          echo "${{ needs.setup.outputs.files }}" > files.txt
           rm -f .markdownlint.log
           if [ -s files.txt ]; then
+            echo "Running markdownlint..."
             npx markdownlint $(cat files.txt) 2>&1 | tee .markdownlint.log || true
           else
-            echo "No .md files to lint."
+            echo "No matching .md files to lint."
           fi
 
       - name: Comment on PR (markdownlint)
-        if: success() || failure()
         run: |
           if [ -s .markdownlint.log ]; then
             echo "### :policeman: markdownlint Report" > .body.txt
