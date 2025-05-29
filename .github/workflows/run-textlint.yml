@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'npm'
@@ -31,7 +31,7 @@ jobs:
 
       - name: Add markdownlint problem matcher (only for markdownlint)
         if: matrix.linter == 'markdownlint'
-        uses: xt0rted/markdownlint-problem-matcher@v2
+        uses: xt0rted/markdownlint-problem-matcher@v3
 
       - name: Get changed Markdown files
         id: changed
@@ -51,7 +51,11 @@ jobs:
           rm -f .lint.log
 
           if [ "${{ matrix.linter }}" = "textlint" ]; then
-            xargs npx textlint < files.txt 2>&1 | tee .lint.log || true
+            while read -r file; do
+              dir=$(dirname "$file")
+              echo "Running textlint in $dir for $file"
+              (cd "$dir" && npx textlint "$(basename "$file")") 2>&1 || true
+            done < files.txt | tee .lint.log
           else
             npx markdownlint $(cat files.txt) 2>&1 | tee .lint.log || true
           fi
